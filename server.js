@@ -23,13 +23,13 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { WebSocketServer } from 'ws';
-import { initialState, applyMove } from './engine.js';
+import { initialState, applyMove, restoreState } from './engine.js';
 
 export const VERSION = '1.0.0';
 
 const COLORS = ['white', 'black'];
 const ACTIONS = new Set(['move', 'resign', 'offer-draw', 'accept-draw', 'rematch']);
-const KINDS = new Set(['move', 'exchange', 'deploy', 'citadel-swap', 'citadel-draw']);
+const KINDS = new Set(['move', 'exchange', 'deploy', 'royal-return']);
 
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_WS_PAYLOAD = 8 * 1024;
@@ -304,7 +304,7 @@ export function createApp(options = {}) {
   for (const row of stmtAllRooms.all()) {
     let state;
     try {
-      state = JSON.parse(row.state);
+      state = restoreState(JSON.parse(row.state));
     } catch {
       state = null;
     }

@@ -9,7 +9,7 @@ export const COLORS = ['white', 'black'];
 export const TYPES = {
   king: {
     name: 'King', short: 'K',
-    description: 'Royal, highest rank. Moves one square in any direction. While it is your only royal it may never be left attacked. Once per game, when checked or stalemated, it may swap places with any friendly non-royal piece.',
+    description: 'Royal, highest rank. Moves one square in any direction. While it is your only royal it may never be left attacked. Once per game, while it is attacked, it may swap places with any friendly piece, including another royal, but never into its own citadel.',
   },
   prince: {
     name: 'Prince', short: 'Pr',
@@ -17,7 +17,7 @@ export const TYPES = {
   },
   adventitious: {
     name: 'Adventitious king', short: 'Ad',
-    description: 'Royal, third rank. Moves one square in any direction. Created only by the third promotion of the pawn-of-pawns. It alone may enter its own citadel, where it is immune; if it is your last royal it instead returns to the pawn-of-pawns home square.',
+    description: 'Royal, third rank. Moves one square in any direction. Created only by the third promotion of the pawn-of-pawns. It alone may shelter in its own citadel; as your only royal it must then be placed by you on an empty, unattacked square of the main board, which spends no turn.',
   },
   rook: {
     name: 'Rook', short: 'R',
@@ -37,7 +37,7 @@ export const TYPES = {
   },
   ferz: {
     name: 'Ferz', short: 'F',
-    description: 'Moves exactly one square diagonally in any direction.',
+    description: 'Moves exactly one square diagonally in any direction. Called the General in the historical Tamerlane source.',
   },
   vizier: {
     name: 'Vizier', short: 'V',
@@ -53,24 +53,24 @@ export const TYPES = {
   },
   engine: {
     name: 'Engine', short: 'En',
-    description: 'Leaps exactly two squares horizontally or vertically (2,0), jumping over the skipped square.',
+    description: 'Leaps exactly two squares horizontally or vertically (2,0), jumping over the skipped square. Called the war engine in the historical Tamerlane source.',
   },
   pawn: {
     name: 'Pawn', short: 'P',
-    description: 'Moves one square straight forward onto an empty square and captures one square diagonally forward. Promotion follows the pawn’s original file, even after captures change its file; the king-pawn becomes a prince. Only the pawn starting on White’s a3 (Black’s k8) is the pawn-of-pawns: its three arrivals produce a dormant pawn, a returning pawn, then an adventitious king. The opposite rook-pawn, starting on White’s k3 (Black’s a8), promotes to a rook.',
+    description: 'Moves one square straight forward onto an empty square and captures one square diagonally forward. Promotion follows the pawn’s original file, even after captures change its file; the king-pawn becomes a prince. Only the pawn starting on White’s a3 (Black’s k8) is the pawn-of-pawns: its three arrivals produce a dormant, immune pawn, a returning pawn, then an adventitious king. A dormant pawn may optionally deploy to a square where it forks or traps an enemy unit, while the side may instead play any ordinary move. The opposite rook-pawn, starting on White’s k3 (Black’s a8), promotes to a rook.',
   },
 };
 
 export const RULE_NOTES = [
-  '1. Royal exchange: the historical "king swap" is generalized to the highest remaining royal (king, then prince, then adventitious). Once per game per side, only when that royal is attacked or the side otherwise has no legal move; it swaps with any friendly non-royal piece and is legal only if the royal is not attacked after the swap. The swap consumes the turn.',
-  '2. Sheltered-royal return is a modern completion of an unresolved historical edge, not an established manuscript rule. When a sheltered adventitious king becomes its side’s only royal, it returns to the pawn-of-pawns home square (white a3, black k8). A non-royal occupant is removed; a royal is never overwritten. If a royal occupies that square, use the nearest empty, unattacked home-pawn square, scanning outward by file distance, then across outward ranks. Voluntary entry must still leave the last royal safe after the return.',
-  '3. Pawn-of-pawns second arrival: the pawn returns to the king-pawn home square (white f3 "5,2", black f8 "5,7"), removing a non-royal occupant as captured. If any royal occupies that square the pawn instead waits on the last rank, dormant and immune (awaitingReturn), and the return auto-resolves after any later move once the square is free of royals (history kind "return", no turn or ply change).',
-  '4. Deployment of the pawn-of-pawns: qualifying squares are computed with the full legal-move generator — enemy escape includes capturing the deployed pawn, moving the unit, and respects pins and friendly covering; a merely forward-blocked pawn is not falsely trapped if it can capture. If no square qualifies, ordinary moves are allowed and the pawn stays dormant. Deployment may replace an own or enemy non-royal occupant but never a royal and never an immune (dormant) piece. Deployment onto the last rank does not count as an arrival. The escape simulation is bounded to depth 3; deeper nesting conservatively treats the unit as escaping (unreachable in normal play).',
-  '5. Opponent-citadel entry: only the highest royal may enter. The entering move ends the move part of the turn but the mover must immediately choose: citadel-draw (result draw, reason "citadel draw") or, once per game, citadel-swap with another own royal; the choice consumes the same turn (ply is not incremented again). If no swap is available the draw is forced.',
-  '6. Checkmate OR stalemate loses: a side to move with at least one royal and no legal moves loses — reason "checkmate" if its highest royal is attacked, else "stalemate". There are no fifty-move or repetition draws; draws arise only from the citadel declaration or by agreement/resignation handled by the server.',
-  '7. Check means the highest remaining royal is attacked. With two or more royals, royals may be exposed and captured like ordinary pieces; the last royal may never be left attacked. A side with no royal at all is treated as non-terminal so tutorial and sparse custom positions remain playable.',
+  '1. Royal exchange: once per game per side, and only while that side\'s reigning royal (king, then prince, then adventitious) is attacked — never merely because the side is stalemated — the royal may swap places with any friendly piece, including another royal. The swap consumes the turn, may not place the royal in its own citadel, and is legal only if the royal is not attacked on the square it reaches.',
+  '2. Opponent-citadel entry: only the reigning royal may enter the opponent\'s citadel, and the entry is an immediate draw (result reason "citadel draw"). There is no declaration, no continuation swap and no choice of any kind.',
+  '3. Sheltered-royal return is Hans Bodlaender\'s INVENTION, not historical evidence. Only an adventitious king may shelter in its own citadel. When it is its side\'s only royal — by voluntary entry or when its other royal is captured — its owner must place it on an empty main-board square of their choice that does not leave it attacked. The placement spends no turn and does not increment ply; the side whose turn would normally follow then plays normally (after a capture, that is the owner; after a voluntary entry, the opponent). If no such square exists the side loses.',
+  '4. Pawn-of-pawns arrivals: the first arrival leaves the pawn dormant and uncapturable on the far rank. The second arrival returns it to the king-pawn home square (white f3 "5,2", black f8 "5,7"), removing a non-royal occupant as captured. The source does not specify a royal occupant there; as a clearly labelled completion of that gap, the pawn waits dormant on the far rank and returns automatically once the square is free of royals (history kind "return", no turn or ply change). The third arrival becomes an adventitious king.',
+  '5. Deployment of a dormant pawn-of-pawns is OPTIONAL: the side may always play an ordinary move instead. A square qualifies when the pawn would there attack two or more enemy units, or one enemy unit with no legal escape after full simulation (pins, covering pieces and the capture of the deployed pawn all count). Deployment may replace any friendly or enemy piece except a reigning royal of either side — surplus lower royals are ordinary capturable pieces — and never an immune dormant piece. Deployment onto the far rank is not a new arrival. The escape simulation is bounded to depth 3; deeper nesting conservatively treats the unit as escaping (unreachable in normal play).',
+  '6. Checkmate OR stalemate loses: a side to move with at least one royal and no legal moves loses, and the winner is always the opponent of that side — reason "checkmate" if its reigning royal is attacked, else "stalemate". There are no fifty-move or repetition draws; draws arise only from citadel entry or agreement handled by the server.',
+  '7. Check means the reigning (highest remaining) royal is attacked. With two or more royals, even the reigning king may be exposed and captured; another royal then takes its role. The last royal may never be left attacked. A side with no royal at all is treated as non-terminal so tutorial and sparse custom positions remain playable.',
   '8. Picket: a diagonal slider with a two-square minimum; the first diagonal square must be empty and blocks everything beyond. Giraffe: one diagonal step then three or more outward orthogonal steps; the entire bent path (including unlandable intermediate squares) must be empty and no U-turns are allowed.',
-  '9. Attribution: the game\'s invention by Timur (Tamerlane) is tradition, not established history. These rules follow the full reconstruction at tamerlaneschess.wordpress.com (2017-03-24), corroborated by en.wikipedia.org/wiki/Tamerlane_chess and en.chessbase.com/post/tamerlane-chess-revived. The chessvariants.com historical page was inaccessible (HTTP 403); the moddable source contained contradictions and was rejected as non-authoritative.',
+  '9. Source and attribution: these rules follow Hans Bodlaender\'s historic Tamerlane page at chessvariants.com (1996, revised 2003). Internal type IDs are unchanged; the source\'s General is the ferz and its war engine is the engine. The tradition that Timur (Tamerlane) invented the game is not established history. Bodlaender\'s owner-chosen return of a sheltered last royal is his invention, and the wait for a royal to vacate f3/f8 is labelled as a completion of an unspecified edge rather than a documented rule.',
 ];
 
 const FILES = 'abcdefghijk';
@@ -89,7 +89,6 @@ const ROYAL_RANK = { king: 0, prince: 1, adventitious: 2 };
 const isRoyal = (t) => t === 'king' || t === 'prince' || t === 'adventitious';
 const opponent = (c) => (c === 'white' ? 'black' : 'white');
 const PAWN_FILE_PROMOTION = ['pawn', 'engine', 'camel', 'elephant', 'ferz', 'prince', 'vizier', 'giraffe', 'picket', 'knight', 'rook'];
-const PAWN_OF_PAWNS_ORIGIN = { white: '0,2', black: '10,7' };
 const KING_PAWN_HOME = { white: '5,2', black: '5,7' };
 const FAR_RANK = { white: 9, black: 0 };
 const PAWN_DIR = { white: 1, black: -1 };
@@ -112,8 +111,7 @@ export function emptyState() {
     history: [],
     result: null,
     exchangeUsed: { white: false, black: false },
-    citadelUsed: { white: false, black: false },
-    pendingCitadel: null,
+    pendingRoyalReturn: null,
   };
 }
 
@@ -364,7 +362,7 @@ function canUnitEscape(state, pawnKey, s, unit, sim) {
   delete moved.dormant;
   delete nb[s];
   nb[s] = moved;
-  const hypo = { ...state, board: nb, turn: opponent(color), pendingCitadel: null };
+  const hypo = { ...state, board: nb, turn: opponent(color), pendingRoyalReturn: null };
   const dir = PAWN_DIR[color];
   const [sx, sy] = parseKey(s);
   const enemyMoves = allLegal(hypo, sim + 1);
@@ -387,13 +385,16 @@ function canUnitEscape(state, pawnKey, s, unit, sim) {
 function genDeploys(state, pawnKey, royals, sim) {
   const board = state.board, color = state.turn, dir = PAWN_DIR[color];
   const pawn = board[pawnKey];
+  // Deployment may displace any piece except each side's reigning royal
+  // (highest royal, whatever its type) and an immune dormant piece.
+  const reigning = new Set([highestRoyalId(board, color), highestRoyalId(board, opponent(color))]);
   const out = [];
   for (let sy = 0; sy <= 9; sy++) {
     for (let sx = 0; sx <= 10; sx++) {
       const s = key(sx, sy);
       if (s === pawnKey) continue;
       const occ = board[s];
-      if (occ && (isRoyal(occ.type) || occ.dormant)) continue;
+      if (occ && (occ.dormant || reigning.has(occ.id))) continue;
       const attacked = [];
       for (const dx of [-1, 1]) {
         const tx = sx + dx, ty = sy + dir;
@@ -418,13 +419,28 @@ function genDeploys(state, pawnKey, royals, sim) {
   return out;
 }
 
-function citadelChoiceMoves(state) {
-  const pc = state.pendingCitadel;
-  const out = [{ from: pc.citadel, to: pc.citadel, kind: 'citadel-draw' }];
-  if (!state.citadelUsed[pc.color]) {
-    for (const rk of royalList(state.board, pc.color)) {
-      const p = state.board[rk];
-      if (p.id !== pc.royal) out.push({ from: pc.citadel, to: rk, kind: 'citadel-swap', with: p.id });
+// Every empty main-board square that keeps a returning sole royal safe.
+// While pendingRoyalReturn is set these are the only legal moves.
+function royalReturnMoves(state) {
+  const prr = state.pendingRoyalReturn;
+  if (!prr) return [];
+  const royal = state.board[prr.from];
+  if (!royal) return [];
+  const board = { ...state.board };
+  delete board[prr.from];
+  const sole = royalList(board, prr.color).length === 0;
+  const out = [];
+  for (let y = 0; y <= 9; y++) {
+    for (let x = 0; x <= 10; x++) {
+      const k = key(x, y);
+      if (board[k]) continue;
+      if (sole) {
+        board[k] = royal;
+        const safe = !isAttacked(board, k, opponent(prr.color));
+        delete board[k];
+        if (!safe) continue;
+      }
+      out.push({ from: prr.from, to: k, kind: 'royal-return' });
     }
   }
   return out;
@@ -435,12 +451,11 @@ function allLegal(state, sim) {
   sim = sim || 0;
   if (state.result) return [];
   const board = state.board, color = state.turn;
-  if (state.pendingCitadel) return citadelChoiceMoves(state);
+  if (state.pendingRoyalReturn) return royalReturnMoves(state);
   const royals = royalList(board, color);
   const hid = royals.length ? board[royals[0]].id : null;
-  const pendingReturns = Object.keys(board).some((k) => board[k].awaitingReturn ||
-    (board[k].type === 'adventitious' && k === OWN_CITADEL[board[k].color]));
-  // Forced deployment of a dormant pawn-of-pawns.
+  const pendingReturns = Object.keys(board).some((k) => board[k].awaitingReturn);
+  // One dormant pawn-of-pawns may redeploy, but only as an extra option.
   let dormKey = null;
   for (const k of Object.keys(board)) {
     const p = board[k];
@@ -449,10 +464,6 @@ function allLegal(state, sim) {
       break;
     }
   }
-  if (dormKey) {
-    const deploys = genDeploys(state, dormKey, royals, sim);
-    if (deploys.length) return deploys;
-  }
   const moves = [];
   const keys = Object.keys(board);
   for (const k of keys) {
@@ -460,13 +471,24 @@ function allLegal(state, sim) {
     if (p.color !== color || p.dormant) continue;
     const dests = pseudoMoves(board, k, p, hid);
     for (const to of dests) {
+      // Entering the opponent citadel is an immediate draw, hence always legal.
+      if (to === OPP_CITADEL[color]) {
+        moves.push({ from: k, to, kind: 'move' });
+        continue;
+      }
       const transforms = pendingReturns ||
         (p.type === 'pawn' && parseKey(to)[1] === FAR_RANK[color]) ||
         (p.type === 'adventitious' && to === OWN_CITADEL[color]);
       if (transforms) {
-        const nb = applyInternal(state, { from: k, to, kind: 'move' }, false).board;
-        const remaining = royalList(nb, color);
-        if (remaining.length === 1 && isAttacked(nb, remaining[0], opponent(color))) continue;
+        const ns = applyInternal(state, { from: k, to, kind: 'move' }, false);
+        // A sole sheltered royal with no safe square loses at once: refuse it.
+        if (ns.result && ns.result.winner === opponent(color)) continue;
+        if (ns.pendingRoyalReturn && ns.pendingRoyalReturn.color === color) {
+          moves.push({ from: k, to, kind: 'move' });
+          continue;
+        }
+        const remaining = royalList(ns.board, color);
+        if (remaining.length === 1 && isAttacked(ns.board, remaining[0], opponent(color))) continue;
       } else if (royals.length === 1) {
         const nb = { ...board };
         delete nb[k];
@@ -476,13 +498,15 @@ function allLegal(state, sim) {
       moves.push({ from: k, to, kind: 'move' });
     }
   }
-  // Royal exchange: once per game, in check or otherwise stalemated.
+  if (dormKey) moves.push(...genDeploys(state, dormKey, royals, sim));
+  // Royal exchange: once per game, only while the reigning royal is attacked.
   if (!state.exchangeUsed[color] && royals.length) {
     const hk = royals[0];
-    if (isAttacked(board, hk, opponent(color)) || moves.length === 0) {
+    if (isAttacked(board, hk, opponent(color))) {
+      const ownCitadel = OWN_CITADEL[color];
       for (const k of keys) {
         const p = board[k];
-        if (p.color !== color || isRoyal(p.type)) continue;
+        if (k === hk || p.color !== color || k === ownCitadel) continue;
         const nb = { ...board };
         nb[hk] = p;
         nb[k] = board[hk];
@@ -502,47 +526,6 @@ export function inCheck(state, color) {
   const royals = royalList(state.board, color);
   if (!royals.length) return false;
   return isAttacked(state.board, royals[0], opponent(color));
-}
-
-// Pawn-of-pawns home-rank scan for the sole-royal citadel return.
-function freeHomeSquareScan(board, color, origin) {
-  const [ox] = parseKey(origin);
-  const homeY = color === 'white' ? 2 : 7;
-  const yStep = color === 'white' ? 1 : -1;
-  for (let r = 0; ; r++) {
-    const y = homeY + r * yStep;
-    if (y < 0 || y > 9) return null;
-    for (let d = 0; d <= 10; d++) {
-      const xs = d === 0 ? [ox] : [ox - d, ox + d];
-      for (const x of xs) {
-        if (x < 0 || x > 10) continue;
-        if (!board[key(x, y)] && !isAttacked(board, key(x, y), opponent(color))) return key(x, y);
-      }
-    }
-  }
-}
-
-function relocateAdventitious(board, color, fromKey, history) {
-  const p = board[fromKey];
-  const origin = PAWN_OF_PAWNS_ORIGIN[color];
-  const occ = board[origin];
-  let target = null;
-  let captured = null;
-  if (!occ || !isRoyal(occ.type)) {
-    target = origin;
-    captured = occ ? occ.type : null;
-  } else {
-    target = freeHomeSquareScan(board, color, origin) || fromKey; // full board never occurs
-  }
-  if (target !== fromKey) {
-    delete board[fromKey];
-    board[target] = p;
-    history.push({
-      from: fromKey, to: target, kind: 'return', piece: p.type, color,
-      ...(captured ? { capture: captured } : {}),
-      notation: TYPES[p.type].short + ' returns ' + squareName(target),
-    });
-  }
 }
 
 function handlePawnArrival(board, toKey, p, color, history) {
@@ -617,32 +600,33 @@ function applyInternal(state, move, checkEnd) {
   let ply = state.ply + 1;
   let result = state.result;
   let exchangeUsed = state.exchangeUsed;
-  let citadelUsed = state.citadelUsed;
-  let pendingCitadel = null;
+  let pendingRoyalReturn = null;
 
-  if (kind === 'citadel-draw') {
-    const piece = board[move.from];
+  if (kind === 'royal-return') {
+    const prr = state.pendingRoyalReturn;
+    const royal = board[move.from];
+    delete board[move.from];
+    board[move.to] = royal;
+    turn = prr.resumeTurn;
+    ply = state.ply; // the placement spends no turn and adds no ply
     history.push({
-      from: move.from, to: move.to, kind, piece: piece ? piece.type : 'king', color,
-      notation: 'citadel draw',
+      from: move.from, to: move.to, kind, piece: royal.type, color: prr.color,
+      notation: TYPES[royal.type].short + ' returns ' + squareName(move.to),
     });
-    result = { winner: null, reason: 'citadel draw' };
-    ply = state.ply; // choice consumes the same turn
-  } else if (kind === 'citadel-swap') {
-    const a = board[move.from];
-    const b = board[move.to];
-    board[move.from] = b;
-    board[move.to] = a;
-    citadelUsed = { ...citadelUsed, [color]: true };
-    history.push({
-      from: move.from, to: move.to, kind, piece: a.type, color,
-      notation: TYPES[a.type].short + ' citadel<->' + squareName(move.to),
-    });
-    ply = state.ply; // choice consumes the same turn
   } else if (kind === 'exchange') {
     const a = board[move.from];
     const b = board[move.to];
-    board[move.from] = b;
+    const moved = { ...b };
+    // Leaving the far rank ends dormancy/immunity of a pawn-of-pawns but
+    // keeps its promotion stage.
+    if (moved.dormant || moved.awaitingReturn) {
+      const [, ny] = parseKey(move.from);
+      if (ny !== FAR_RANK[moved.color]) {
+        delete moved.dormant;
+        delete moved.awaitingReturn;
+      }
+    }
+    board[move.from] = moved;
     board[move.to] = a;
     exchangeUsed = { ...exchangeUsed, [color]: true };
     history.push({
@@ -672,31 +656,50 @@ function applyInternal(state, move, checkEnd) {
       notation: TYPES[p.type].short + squareName(move.from) + (occ ? 'x' : '-') + squareName(move.to),
     });
     if (isRoyal(p.type) && move.to === OPP_CITADEL[color]) {
-      pendingCitadel = { color, royal: p.id, citadel: move.to };
-      turn = color; // mover must immediately choose
+      // The entry alone ends the game as a draw; no choice follows.
+      result = { winner: null, reason: 'citadel draw' };
     } else if (p.type === 'adventitious' && move.to === OWN_CITADEL[color]) {
-      if (royalList(board, color).length === 1) relocateAdventitious(board, color, move.to, history);
+      if (royalList(board, color).length === 1) {
+        pendingRoyalReturn = { color, royal: p.id, from: move.to, resumeTurn: opponent(color) };
+        turn = color; // the owner places it before the next turn
+      }
     } else if (p.type === 'pawn') {
       const [, ty] = parseKey(move.to);
       if (ty === FAR_RANK[color]) handlePawnArrival(board, move.to, p, color, history);
     }
   }
 
-  resolveAwaitingReturns(board, history);
-  for (const side of COLORS) {
-    const sheltered = board[OWN_CITADEL[side]];
-    if (sheltered?.type === 'adventitious' && sheltered.color === side &&
-        royalList(board, side).length === 1) {
-      relocateAdventitious(board, side, OWN_CITADEL[side], history);
+  if (kind !== 'royal-return' && !result) {
+    resolveAwaitingReturns(board, history);
+    if (!result && !pendingRoyalReturn) {
+      // A captured royal may leave a sheltered adventitious king as the
+      // side's only royal: its owner must bring it back to the main board.
+      for (const side of COLORS) {
+        const sheltered = board[OWN_CITADEL[side]];
+        if (sheltered && sheltered.type === 'adventitious' && sheltered.color === side &&
+            royalList(board, side).length === 1) {
+          pendingRoyalReturn = {
+            color: side, royal: sheltered.id, from: OWN_CITADEL[side], resumeTurn: turn,
+          };
+          turn = side;
+          break;
+        }
+      }
+    }
+    if (pendingRoyalReturn && royalReturnMoves({ board, pendingRoyalReturn }).length === 0) {
+      const owner = pendingRoyalReturn.color;
+      const mated = isAttacked(board, pendingRoyalReturn.from, opponent(owner));
+      result = { winner: opponent(owner), reason: mated ? 'checkmate' : 'stalemate' };
+      pendingRoyalReturn = null;
     }
   }
 
-  const next = { board, turn, ply, history, result, exchangeUsed, citadelUsed, pendingCitadel };
-  if (checkEnd && !result && !pendingCitadel) {
+  const next = { board, turn, ply, history, result, exchangeUsed, pendingRoyalReturn };
+  if (checkEnd && !result && !pendingRoyalReturn) {
     const sideRoyals = royalList(board, turn);
     if (sideRoyals.length && allLegal(next, 0).length === 0) {
       const mated = isAttacked(board, sideRoyals[0], opponent(turn));
-      next.result = { winner: color, reason: mated ? 'checkmate' : 'stalemate' };
+      next.result = { winner: opponent(turn), reason: mated ? 'checkmate' : 'stalemate' };
     }
   }
   return next;
@@ -713,6 +716,29 @@ export function applyMove(state, move) {
     (m.replaces === undefined || m.replaces === move.replaces));
   if (!cand) throw new Error('illegal move');
   return applyInternal(state, cand, true);
+}
+
+// Upgrades a persisted state to the current shape. Pure: the input is never
+// modified and board/ledger contents are preserved. Call at storage
+// boundaries only; generated states already match this shape.
+export function restoreState(state) {
+  if (!state || typeof state !== 'object' || !state.board) throw new Error('invalid state');
+  const legacyCitadel = state.pendingCitadel;
+  const next = { ...state };
+  delete next.pendingCitadel;
+  delete next.citadelUsed;
+  next.exchangeUsed = { white: false, black: false, ...(state.exchangeUsed || {}) };
+  next.pendingRoyalReturn = state.pendingRoyalReturn || null;
+  if (!Array.isArray(next.history)) next.history = [];
+  if (typeof next.ply !== 'number') next.ply = 0;
+  if (next.result === undefined) next.result = null;
+  if (legacyCitadel && !next.result) {
+    // The old pending citadel choice is the immediate draw the source
+    // mandates: no extra ply, no extra ledger entry, board untouched.
+    next.result = { winner: null, reason: 'citadel draw' };
+    next.pendingRoyalReturn = null;
+  }
+  return next;
 }
 
 // ---------------- Bot (bounded, deterministic) ----------------

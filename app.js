@@ -1,6 +1,6 @@
-import * as engine from './engine.js';
+import * as engine from './engine.js?v=3';
 import {pieceSVG} from './pieces.js';
-import {LESSONS} from './tutorial.js';
+import {LESSONS} from './tutorial.js?v=3';
 import {SERVERS} from './config.js';
 
 const $ = id => document.getElementById(id);
@@ -21,8 +21,8 @@ function usableState(state) {
 }
 const saved = readStored(STORAGE,null);
 const savedLocal = readStored(LOCAL_STORAGE,saved?.side === 'both' ? saved : null);
-let soloState = usableState(saved?.state) && saved?.side !== 'both' ? saved.state : engine.initialState();
-let localState = usableState(savedLocal?.state) ? savedLocal.state : engine.initialState();
+let soloState = usableState(saved?.state) && saved?.side !== 'both' ? engine.restoreState(saved.state) : engine.initialState();
+let localState = usableState(savedLocal?.state) ? engine.restoreState(savedLocal.state) : engine.initialState();
 let side = ['white','black'].includes(saved?.side) ? saved.side : 'white';
 let difficulty = saved?.difficulty === 'easy' ? 'easy' : 'standard';
 let flipped = saved?.flipped ?? side === 'black';
@@ -73,7 +73,7 @@ function stateNow() { return mode === 'learn' ? lessonState : mode === 'online' 
 function canPlay() {
   const state = stateNow();
   if (state.result) return false;
-  if (mode === 'learn') return !lessonComplete || Boolean(state.pendingCitadel);
+  if (mode === 'learn') return !lessonComplete || Boolean(state.pendingRoyalReturn);
   if (mode === 'online') return Boolean(activeSeat && online.state && online.room?.players?.length === 2 && online.you === state.turn && !actionPending && onlineHealthy);
   if (mode === 'local') return true;
   return !thinking && !botError && side === state.turn;
@@ -101,7 +101,7 @@ function scheduleBot() {
   const signature = JSON.stringify(sourceState);
   thinking = true;
   render();
-  try { worker = new Worker(new URL('./bot-worker.js',import.meta.url),{type:'module'}); }
+  try { worker = new Worker(new URL('./bot-worker.js?v=3',import.meta.url),{type:'module'}); }
   catch(error) { failBot(error.message); return; }
   function failBot(message) {
     if (myGeneration !== generation) return;
@@ -124,7 +124,8 @@ function scheduleBot() {
 function renderBoard(state) {
   const activeKey = document.activeElement?.dataset?.square;
   currentMoves = safeMoves(state);
-  const destinations = new Set(selected && canPlay() ? currentMoves.filter(move=>move.from===selected).map(move=>move.to) : []);
+  const source = state.pendingRoyalReturn?.from || selected;
+  const destinations = new Set(source && canPlay() ? currentMoves.filter(move=>move.from===source).map(move=>move.to) : []);
   const last = state.history.at(-1);
   const checked = new Set();
   for (const color of ['white','black']) {
@@ -175,15 +176,20 @@ function renderHistory(state) {
 }
 function specialLabel(move) {
   const destination=squareName(move.to);
-  return moveKind(move)==='citadel-draw'?'Declare a draw':moveKind(move)==='citadel-swap'?`Continue: royal swap with ${destination}`:moveKind(move)==='exchange'?`Royal exchange · ${squareName(move.from)} ↔ ${destination}`:`Deploy pawn at ${destination}`;
+  return moveKind(move)==='royal-return'?`Return adventitious king to ${destination}`:moveKind(move)==='exchange'?`Royal exchange · ${squareName(move.from)} ↔ ${destination}`:`Deploy pawn at ${destination}`;
 }
 function renderSpecials(state) {
   const specials=currentMoves.filter(move=>moveKind(move)!=='move');
   if (!specials.length) { $('special-actions').replaceChildren(); return; }
-  const pending=state.pendingCitadel;
+  const pending=state.pendingRoyalReturn;
   const deployment=specials.some(move=>moveKind(move)==='deploy');
-  const visible = specials.filter(move=>moveKind(move)!=='deploy' || !selected || move.from===selected);
-  $('special-actions').innerHTML=`<h3>${pending?'A choice at the citadel':deployment?'Compulsory pawn deployment':'A royal escape is available'}</h3><p>${pending?'Entering and resolving this choice use a single turn. Declare a draw, or exchange with an eligible royal to continue.':deployment?'Select the dormant pawn, then a marked square, or choose a destination below. Ordinary moves are unavailable while deployment is legal.':'Once per game, your checked or stalemated king may exchange with a friendly non-royal.'}</p><div class="button-row">${visible.map(move=>`<button data-special="${currentMoves.indexOf(move)}" ${canPlay()?'':'disabled'}>${esc(specialLabel(move))}</button>`).join('')}</div>`;
+  const exchange=specials.some(move=>moveKind(move)==='exchange');
+  const heading=pending?'Return your sheltered royal':'Optional special actions';
+  const help=pending?'You own this choice: return your only adventitious king to any marked, safe empty main-board square. Click a marked square or choose a named destination below. This free placement spends no turn. Hans Bodlaender invented this completion; it is not a historically recorded rule. Ordinary last-royal safety applies.':[
+    deployment?'You may redeploy the dormant pawn to a qualifying square, or select any other piece for an ordinary move. Deployment spends your turn. It may replace a friendly or enemy piece, but never a reigning king or an enemy immune dormant pawn.':'',
+    exchange?'Once per side, only when checked, the reigning king may exchange with any friendly piece, including another royal, subject to citadel restrictions and last-royal safety.':''
+  ].filter(Boolean).join(' ');
+  $('special-actions').innerHTML=`<h3>${heading}</h3><p>${help}</p><div class="button-row">${specials.map(move=>`<button type="button" data-special="${currentMoves.indexOf(move)}" ${canPlay()?'':'disabled'}>${esc(specialLabel(move))}</button>`).join('')}</div>`;
 }
 function render() {
   const state=stateNow();
@@ -201,7 +207,7 @@ function render() {
   $('game-kicker').textContent=mode==='learn'?`Field school / Lesson ${lessonIndex+1}`:mode==='online'?'Online / Shared court':mode==='local'?'Local / Two players':'Solo / The eleven-file game';
   let status;
   if(state.result) status=`${state.result.winner?`${title(state.result.winner)} wins`:'Draw'} · ${state.result.reason}`;
-  else if(state.pendingCitadel) status=`${title(state.turn)} · Choose your citadel resolution`;
+  else if(state.pendingRoyalReturn) status=`${title(state.turn)} · Choose a safe empty square for your sheltered royal · Free placement`;
   else if(thinking && mode==='solo') status=`${title(state.turn)} is considering the court…`;
   else if(mode==='online' && !online.state) status='Choose or create a room above. Your solo game is safe.';
   else if(mode==='online' && online.room?.players?.length<2) status='Waiting for the second player. Share your invitation.';
@@ -217,7 +223,8 @@ function render() {
 
 function selectSquare(key) {
   const state=stateNow();
-  const candidates=selected && canPlay()?currentMoves.filter(move=>move.from===selected && move.to===key):[];
+  const source=state.pendingRoyalReturn?.from || selected;
+  const candidates=source && canPlay()?currentMoves.filter(move=>move.from===source && move.to===key):[];
   if(candidates.length===1) { commitMove(candidates[0]); return; }
   if(candidates.length>1) { notify('More than one action reaches this square. Choose the named action below the board.'); return; }
   inspected=key;
@@ -239,9 +246,10 @@ async function commitMove(move) {
     else if(mode==='local') { localState=next; saveDeviceGame(); }
     else {
       lessonState=next;
-      if(LESSONS[lessonIndex].accepts(legal,state,next) || (lessonComplete && state.pendingCitadel)) { lessonComplete=true; lessonFeedback=next.pendingCitadel?'Good entry. Resolve the citadel choice below the board.':'Well played. You made the required legal move.'; }
-      else if(moveKind(legal).startsWith('citadel-')) { lessonComplete=true; lessonFeedback='The citadel choice is resolved. Well played.'; }
-      else lessonFeedback='That was legal, but not the lesson’s target. Retry to restore the exercise.';
+      if(LESSONS[lessonIndex].accepts(legal,state,next) || (lessonComplete && state.pendingRoyalReturn && moveKind(legal)==='royal-return')) {
+        lessonComplete=true;
+        lessonFeedback=next.pendingRoyalReturn?'Good move. Choose any marked safe empty square to return your sheltered royal before continuing.':moveKind(legal)==='royal-return'?'Well played. Your free return is complete; the normal turn resumes.':'Well played. You made the required legal move.';
+      } else lessonFeedback='That was legal, but not the lesson’s target. Retry to restore the exercise.';
     }
     render(); scheduleBot();
   } catch(error) { notify(error.message,true); }
@@ -280,7 +288,7 @@ function renderLesson() {
   $('lesson-feedback').textContent=lessonFeedback || 'Make the required move on the board to continue.';
   $('lesson-feedback').classList.toggle('success',lessonComplete);
   $('lesson-prev').disabled=lessonIndex===0;
-  $('lesson-next').disabled=!lessonComplete || Boolean(lessonState.pendingCitadel);
+  $('lesson-next').disabled=!lessonComplete || Boolean(lessonState.pendingRoyalReturn);
   $('lesson-next').textContent=lessonIndex===LESSONS.length-1?'Play solo':'Next';
 }
 function loadLesson(index) {
@@ -291,7 +299,7 @@ function renderCatalog() {
   $('piece-catalog').innerHTML=Object.entries(engine.TYPES).map(([type,data])=>`<button class="piece-card" data-piece-type="${esc(type)}" aria-label="Inspect ${esc(data.name)}">${pieceSVG({type,color:'white',promotion:type==='pawn'?'rook':undefined})}<span><strong>${esc(data.name)}</strong>${esc(data.description)}</span></button>`).join('');
   const notes=engine.RULE_NOTES;
   const noteList=Array.isArray(notes)?notes:typeof notes==='string'?[notes]:notes&&typeof notes==='object'?Object.entries(notes).map(([key,value])=>`${key}: ${typeof value==='string'?value:JSON.stringify(value)}`):[];
-  const baseNotes=['Pawns advance one square; no double step, en passant or castling. Each pawn promotes according to its original file. The king-pawn becomes a prince.','Royal precedence is king, then prince, then adventitious king. Only the last royal must be kept out of check. Checkmate and stalemate both lose; bare royal, repetition and fifty moves do not automatically end play.','The picket’s first diagonal square blocks it even though it cannot land there. The giraffe’s entire bent route must be clear, including intermediate squares on which it cannot stop.','A citadel entrance keeps the mover’s turn pending until a draw or eligible once-only royal swap is selected. A legal pawn-of-pawns deployment is compulsory.'];
+  const baseNotes=['Pawns advance one square; no double step, en passant or castling. Each pawn promotes according to its original file. The king-pawn becomes a prince. General means ferz; war engine means engine.','Royal precedence is king, then prince, then adventitious king. Only the last royal must be kept out of check. Checkmate and stalemate both lose; bare royal, repetition and fifty moves do not automatically end play.','The picket’s first diagonal square blocks it even though it cannot land there. The giraffe’s entire bent route must be clear, including intermediate squares on which it cannot stop.','A reigning king entering the opponent’s citadel draws immediately. Pawn-of-pawns redeployment is optional; ordinary moves remain available. Once per side, only when checked, the reigning king may exchange with any friendly piece, including another royal.','Only an adventitious king may shelter in its own citadel. When it becomes the only royal, its owner freely chooses a safe empty main-board square to return to, without spending a turn. This completion is Hans Bodlaender’s invention, not historical evidence. Ordinary last-royal safety applies; no safe empty destination means a loss.','On its second arrival, the pawn-of-pawns returns to f3 for White or f8 for Black. If a royal occupies that square, this reconstruction waits until it is free of royals: an explicitly retained completion for a case the source does not specify.'];
   $('rule-notes').innerHTML=[...baseNotes,...noteList].map(note=>`<li>${esc(note)}</li>`).join('');
 }
 
@@ -524,7 +532,7 @@ $('solo-side').addEventListener('change',()=>newGame());
 $('difficulty').addEventListener('change',()=>{difficulty=$('difficulty').value;saveDeviceGame();cancelBot();botError='';render();scheduleBot();});
 $('lesson-prev').addEventListener('click',()=>loadLesson(lessonIndex-1));
 $('lesson-retry').addEventListener('click',()=>loadLesson(lessonIndex));
-$('lesson-next').addEventListener('click',()=>{if(!lessonComplete || lessonState.pendingCitadel)return;if(lessonIndex===LESSONS.length-1)setMode('solo');else loadLesson(lessonIndex+1);});
+$('lesson-next').addEventListener('click',()=>{if(!lessonComplete || lessonState.pendingRoyalReturn)return;if(lessonIndex===LESSONS.length-1)setMode('solo');else loadLesson(lessonIndex+1);});
 $('piece-catalog').addEventListener('click',event=>{
   const button=event.target.closest('[data-piece-type]');if(!button)return;
   const type=button.dataset.pieceType;

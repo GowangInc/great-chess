@@ -6,7 +6,7 @@ A browser-native, Linework-styled reconstruction of **Tamerlane chess**: 11 file
 
 - Single player against an easy or standard bot, calculated in a Web Worker.
 - Dedicated **Local** mode for two people sharing one device, with no bot or room required. Solo and Local keep separate automatic device-local saves; changing modes does not replace either game.
-- Eighteen hands-on lessons, movement highlights, piece dossiers and a field guide.
+- Nineteen hands-on lessons, movement highlights, piece dossiers and a field guide, including the explicitly attributed sheltered-royal return choice.
 - Public or password-protected rooms, invitations, saved seats, reconnection, draw offers, resignation and mutual-consent rematches.
 - Concurrent isolated rooms per server; independent server hosts selectable in the advanced lobby.
 - Authoritative server validation; SQLite persistence; salted scrypt passwords and hashed seat credentials at rest.
@@ -28,7 +28,7 @@ npm test
 
 `engine.test.js` exercises movement, blocking, royal safety and exceptional rules. `server.test.js` exercises the actual engine through HTTP/WebSocket room contracts, authentication, isolation and persistence.
 
-Verified before release: 46 behavioral checks pass, including promotion-time royal safety, sheltered-royal return, and room-capacity recovery without deleting saved games. All 18 tutorial exercises were completed through the rendered board; solo play produced a legal bot reply in its worker. Live checks covered public/password rooms, wrong-password rejection, synchronized moves, reconnection and persistence across deployment restarts.
+Verified before release: 57 behavioral checks pass, including immediate citadel draws, optional deployment, checked-only any-friendly exchange, owner-chosen free royal return, promotion-time royal safety, saved-game migration and room-capacity recovery. All 19 tutorial exercises were completed through the rendered board. Two isolated online clients verified that only the owner can choose the return, unsafe squares are unavailable, the placement broadcasts without spending a ply, and the owner's normal turn then continues. The updated bot worker replied legally; same-device Local play and independent saves remain functional.
 
 Local mode was exercised with human moves for both colours, offline play, reload persistence, independent Solo/Local resets, migration of earlier two-player saves, and cancellation/resumption of an in-progress bot calculation. The unnumbered Solo, Local, Online rooms and Learn navigation fits 320px, 390px and desktop widths.
 
@@ -75,14 +75,19 @@ Finished rooms leave the public lobby and release their capacity slot without de
 
 ## Historical basis and reconstruction
 
-The game is associated with Timur's court, but that does not prove that Timur personally invented it or that ordinary chess was “too easy.” “Great Chess” also names other historical large-board variants. This game implements standard Tamerlane chess, **not** Great Chess Completed: the latter's added pieces do not have securely established historical moves.
+The game is associated with Timur's court, but that does not prove that Timur personally invented it or that ordinary chess was “too easy.” “Great Chess” also names other historical large-board variants. This edition follows **Hans Bodlaender's base-game Tamerlane account on The Chess Variant Pages**, not Eric Greenwood's modern variants or Great Chess Completed.
 
 Sources consulted:
 
-- [Greg Myers, *The Rules of Tamerlane Chess* (2017)](https://tamerlaneschess.wordpress.com/2017/03/24/the-rules-of-tamerlane-chess/): detailed reconstruction and discussion of manuscript ambiguities.
+- [Hans Bodlaender, *Tamerlane chess*, The Chess Variant Pages (1996; revised 2003)](https://www.chessvariants.com/historic.dir/tamerlane.html): canonical base rules, supplied in full by the user when automated access returned HTTP 403. The page's general is the ferz; its war engine is the engine.
+- [Greg Myers, *The Rules of Tamerlane Chess* (2017)](https://tamerlaneschess.wordpress.com/2017/03/24/the-rules-of-tamerlane-chess/): alternate reconstruction and discussion of manuscript ambiguities; not the selected ruleset.
 - [Diana Mihajlova, *Tamerlane Chess revived!* (ChessBase, 2023)](https://en.chessbase.com/post/tamerlane-chess-revived): interview, manuscript provenance and movement descriptions.
 - [*Great chess* / Tamerlane chess overview](https://en.wikipedia.org/wiki/Tamerlane_chess): cross-check of setup, promotions, citadels and royal hierarchy.
 
-The interface's **History, sources & the rules we play** section includes the engine's precise `RULE_NOTES`, particularly the exceptional pawn return and sheltered-royal policies. Those deterministic choices are modern reconstruction decisions, not claims of historical certainty. Stalemate loses; no castling, initial pawn double step, en passant, automatic repetition draw or fifty-move draw. Square shading is a readability aid; historical boards were unchequered.
+Entering the opponent's citadel draws immediately. Qualifying pawn-of-pawns redeployment is optional. The once-only king exchange requires check and can use any friendly piece, subject to citadel restrictions and royal safety. Stalemate loses; no castling, initial pawn double step, en passant, bare-king loss, automatic repetition draw or fifty-move draw. Square shading is a readability aid; historical boards were unchequered.
+
+Bodlaender explicitly **invented** the rule allowing the owner to choose an empty return square when a sheltered adventitious king becomes the last royal. This is not claimed as an attested manuscript rule. This edition applies normal last-royal safety to that choice: an empty, unattacked square on the main board. The return is immediate, without another ply or a spent turn; it is not an automatic return to a home square.
+
+The source does not resolve a royal occupying f3/f8 when the pawn-of-pawns makes its second arrival. The existing explicit completion is retained: wait on the last rank, immune, until the royal vacates, then return without another move. The interface's **History, sources & the rules we play** section includes the precise `RULE_NOTES` and marks these edge interpretations. Older saved games already awaiting a citadel declaration are upgraded to a draw without deleting their board, ledger, or seat credentials.
 
 All piece illustrations are original SVG drawings. The design studies the ruled-oval geometry of the illustrated *Cerîde-i Adliye* covers; no reference scans or inscriptions are redistributed.

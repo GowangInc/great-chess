@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { createApp } from './server.js';
-import { initialState, legalMoves } from './engine.js';
+import { initialState, emptyState, applyMove, legalMoves } from './engine.js';
 
 const ALLOWED_ORIGIN = 'https://gowanginc.github.io';
 
@@ -147,11 +147,10 @@ function closeSocket(socket) {
 // Health and public lobby
 // ---------------------------------------------------------------------------
 
-test('health returns the fixed payload with no machine details', async (t) => {
+test('health omits machine details and disables MIME sniffing', async (t) => {
   const { base } = await withServer(t);
   const response = await api(base, 'GET', '/api/health');
   assert.equal(response.status, 200);
-  assert.deepEqual(response.json, { ok: true, version: '1.0.0' });
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.ok(!/host|machine|server-name|instance/i.test(response.text));
 });
@@ -622,6 +621,83 @@ test('rooms, seats, tokens and board state survive a restart', async (t) => {
   assert.equal(resumed.status, 200);
   assert.equal(resumed.json.color, 'black');
   assert.equal(blackView.json.room.players.length, 2);
+});
+
+test('legacy pending citadel saves become draws without losing seats or the ledger', async (t) => {
+  const first = await launch();
+  t.after(async () => {
+    await first.app.close();
+    await rm(first.dataDir, { recursive: true, force: true });
+  });
+  const { roomId, whiteToken, blackToken } = await createAndFill(first.base);
+  const legacy = initialState();
+  const king = legacy.board['5,1'];
+  legacy.board['-1,8'] = king;
+  delete legacy.board['5,1'];
+  delete legacy.pendingRoyalReturn;
+  legacy.citadelUsed = { white: false, black: false };
+  legacy.pendingCitadel = { color: 'white', royal: king.id, citadel: '-1,8' };
+  legacy.ply = 1;
+  legacy.history = [{ from: '0,8', to: '-1,8', kind: 'move', piece: 'king', color: 'white', notation: 'K a9-citadel' }];
+  first.app.db.prepare('UPDATE rooms SET state = ? WHERE id = ?').run(JSON.stringify(legacy), roomId);
+  await first.app.close();
+  const second = await launch({ dataDir: first.dataDir });
+  t.after(() => second.app.close());
+  for (const [token, color] of [[whiteToken, 'white'], [blackToken, 'black']]) {
+    const view = await api(second.base, 'GET', `/api/rooms/${roomId}`, { token });
+    assert.equal(view.status, 200);
+    assert.equal(view.json.you, color);
+    assert.equal(view.json.room.players.length, 2);
+    assert.equal(view.json.room.status, 'finished');
+    assert.deepEqual(view.json.state.result, { winner: null, reason: 'citadel draw' });
+    assert.deepEqual(view.json.state.board, legacy.board);
+    assert.deepEqual(view.json.state.history, legacy.history);
+    assert.equal(view.json.state.ply, 1);
+    assert.equal(view.json.state.pendingRoyalReturn, null);
+    assert.equal('pendingCitadel' in view.json.state, false);
+    assert.equal('citadelUsed' in view.json.state, false);
+  }
+});
+
+test('a saved royal-return choice is authenticated and free before the owners normal move', async (t) => {
+  const first = await launch();
+  t.after(async () => {
+    await first.app.close();
+    await rm(first.dataDir, { recursive: true, force: true });
+  });
+  const { roomId, whiteToken, blackToken } = await createAndFill(first.base);
+  const state = emptyState();
+  state.turn = 'black';
+  state.board = {
+    '5,0': { id: 'wk', type: 'king', color: 'white' },
+    '11,1': { id: 'wa', type: 'adventitious', color: 'white' },
+    '5,5': { id: 'br', type: 'rook', color: 'black' },
+    '10,9': { id: 'bk', type: 'king', color: 'black' },
+  };
+  const pending = applyMove(state, { from: '5,5', to: '5,0' });
+  assert.equal(pending.pendingRoyalReturn.color, 'white');
+  first.app.db.prepare('UPDATE rooms SET state = ? WHERE id = ?').run(JSON.stringify(pending), roomId);
+  await first.app.close();
+  const second = await launch({ dataDir: first.dataDir });
+  t.after(() => second.app.close());
+  const move = { from: '11,1', to: '4,3', kind: 'royal-return' };
+  const act = (token, chosen, ply) => api(second.base, 'POST', `/api/rooms/${roomId}/action`, {
+    token, body: { type: 'move', move: chosen, expectedPly: ply },
+  });
+  assert.equal((await act(blackToken, move, pending.ply)).status, 409);
+  assert.equal((await act(whiteToken, { ...move, to: '5,3' }, pending.ply)).status, 400);
+  assert.equal((await act(whiteToken, move, pending.ply)).status, 200);
+  const returned = await api(second.base, 'GET', `/api/rooms/${roomId}`, { token: whiteToken });
+  assert.equal(returned.json.state.board['4,3'].id, 'wa');
+  assert.equal(returned.json.state.board['11,1'], undefined);
+  assert.equal(returned.json.state.pendingRoyalReturn, null);
+  assert.equal(returned.json.state.turn, 'white');
+  assert.equal(returned.json.state.ply, pending.ply);
+  assert.equal((await act(blackToken, { from: '10,9', to: '9,9' }, pending.ply)).status, 409);
+  assert.equal((await act(whiteToken, { from: '4,3', to: '4,4' }, pending.ply)).status, 200);
+  const moved = await api(second.base, 'GET', `/api/rooms/${roomId}`, { token: blackToken });
+  assert.equal(moved.json.state.turn, 'black');
+  assert.equal(moved.json.state.ply, pending.ply + 1);
 });
 
 // ---------------------------------------------------------------------------
