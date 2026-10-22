@@ -721,6 +721,58 @@ test('the configured room cap is enforced', async (t) => {
   assert.equal(second.status, 503);
 });
 
+test('finished rooms release capacity without losing history or bypassing rematch limits', async (t) => {
+  const { base } = await withServer(t, { maxRooms: 1 });
+  const first = await createAndFill(base);
+  assert.equal((await api(base, 'POST', `/api/rooms/${first.roomId}/action`, {
+    token: first.whiteToken, body: { type: 'resign' },
+  })).status, 200);
+  const second = await createAndFill(base, { name: 'Next game' });
+  const retained = await api(base, 'GET', `/api/rooms/${first.roomId}`, { token: first.whiteToken });
+  assert.equal(retained.json.state.result.reason, 'resignation');
+  assert.equal((await api(base, 'POST', `/api/rooms/${first.roomId}/action`, {
+    token: first.whiteToken, body: { type: 'rematch' },
+  })).status, 200);
+  assert.equal((await api(base, 'POST', `/api/rooms/${first.roomId}/action`, {
+    token: first.blackToken, body: { type: 'rematch' },
+  })).status, 503);
+  assert.equal((await api(base, 'POST', `/api/rooms/${second.roomId}/action`, {
+    token: second.whiteToken, body: { type: 'resign' },
+  })).status, 200);
+  assert.equal((await api(base, 'POST', `/api/rooms/${first.roomId}/action`, {
+    token: first.blackToken, body: { type: 'rematch' },
+  })).status, 200);
+  const replay = await api(base, 'GET', `/api/rooms/${first.roomId}`, { token: first.whiteToken });
+  assert.equal(replay.json.state.result, null);
+  assert.equal(replay.json.state.ply, 0);
+});
+
+test('one-seat rooms age out after 24 hours but can be rejoined without losing the seat', async (t) => {
+  let now = 1_000_000_000;
+  const { base } = await withServer(t, { maxRooms: 1, now: () => now });
+  const first = await api(base, 'POST', '/api/rooms', { body: { name: 'Waiting', playerName: 'Ann' } });
+  const create = () => api(base, 'POST', '/api/rooms', { body: { name: 'Fresh', playerName: 'Bob' } });
+  now += 24 * 60 * 60 * 1000 - 1;
+  assert.equal((await create()).status, 503);
+  now++;
+  assert.deepEqual((await api(base, 'GET', '/api/rooms')).json.rooms, []);
+  const second = await create();
+  assert.equal(second.status, 201);
+  const joinFirst = () => api(base, 'POST', `/api/rooms/${first.json.roomId}/join`, {
+    body: { playerName: 'Guest' },
+  });
+  assert.equal((await joinFirst()).status, 503);
+  assert.equal((await api(base, 'GET', `/api/rooms/${first.json.roomId}`, {
+    token: first.json.token,
+  })).json.you, 'white');
+  await api(base, 'POST', `/api/rooms/${second.json.roomId}/join`, { body: { playerName: 'Guest' } });
+  await api(base, 'POST', `/api/rooms/${second.json.roomId}/action`, {
+    token: second.json.token, body: { type: 'resign' },
+  });
+  assert.equal((await joinFirst()).status, 200);
+  assert.equal((await api(base, 'GET', '/api/rooms')).json.rooms[0].id, first.json.roomId);
+});
+
 test('CORS reflects only configured origins', async (t) => {
   const { base } = await withServer(t);
 

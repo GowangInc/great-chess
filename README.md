@@ -28,7 +28,7 @@ npm test
 
 `engine.test.js` exercises movement, blocking, royal safety and exceptional rules. `server.test.js` exercises the actual engine through HTTP/WebSocket room contracts, authentication, isolation and persistence.
 
-Verified before release: 44 behavioral checks pass, including promotion-time royal safety and return of a sheltered adventitious king after the other royal is captured. All 18 tutorial exercises were completed through the rendered board; solo play produced a legal bot reply in its worker.
+Verified before release: 46 behavioral checks pass, including promotion-time royal safety, sheltered-royal return, and room-capacity recovery without deleting saved games. All 18 tutorial exercises were completed through the rendered board; solo play produced a legal bot reply in its worker. Live checks covered public/password rooms, wrong-password rejection, synchronized moves, reconnection and persistence across deployment restarts.
 
 ## Hosting
 
@@ -65,9 +65,11 @@ Supported server environment variables:
 | `DATA_DIR` | `./data`; Compose uses persistent `/data` |
 | `ALLOWED_ORIGINS` | Comma-separated trusted frontend origins; loopback origins also allowed for local development |
 | `TRUST_PROXY` | Set `1` only behind a trusted proxy; Compose trusts Cloudflare's client-IP header |
-| `MAX_ROOMS` | `200`; room records are retained, not silently expired |
+| `MAX_ROOMS` | `200` concurrent unfinished matches/recent waiting rooms; retained finished games do not consume slots |
 
 API: `GET /api/health`, `GET/POST /api/rooms`, `POST /api/rooms/:id/join`, authenticated `GET /api/rooms/:id`, authenticated `POST /api/rooms/:id/action`, and `/ws`. Seat authentication uses a bearer token, sent in a WebSocket subscription frame rather than the URL. Moves include `expectedPly` and are revalidated against the shared engine. A room password controls entry; an issued seat token reconnects that seat without entering the password again. Losing device storage loses that seat credential. Password-protected room names and occupancy remain visible in the lobby; boards require seat authentication.
+
+Finished rooms leave the public lobby and release their capacity slot without deleting their game state or seat credentials. One-seat waiting rooms leave the lobby after 24 hours and also release capacity; saved seats and direct invitations still work. Rejoining an aged waiting room or starting a mutually agreed rematch requires an available slot. Two-seat unfinished matches are preserved regardless of age. Retained room history remains in SQLite and is loaded into memory at startup; for very large archives, move historical-room reads to a bounded lazy cache before increasing deployment scale.
 
 ## Historical basis and reconstruction
 

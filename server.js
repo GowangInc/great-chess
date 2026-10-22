@@ -328,6 +328,21 @@ export function createApp(options = {}) {
     room.seats[row.color] = { name: row.name, tokenHash: row.token_hash };
   }
 
+  function countsTowardCapacity(room, now = clock()) {
+    if (room.state.result) return false;
+    return Boolean(room.seats.white && room.seats.black) ||
+      now - room.updatedAt < 24 * 60 * 60 * 1000;
+  }
+
+  function atCapacity() {
+    const now = clock();
+    let count = 0;
+    for (const room of rooms.values()) {
+      if (countsTowardCapacity(room, now) && ++count >= roomCap) return true;
+    }
+    return false;
+  }
+
   // Live socket registry: roomId -> {white:Set, black:Set}. Deliberately not
   // persisted; every seat starts disconnected after a restart.
   const roomSockets = new Map();
@@ -657,6 +672,7 @@ export function createApp(options = {}) {
     if (pathname === '/api/rooms') {
       if (method === 'GET') {
         const list = [...rooms.values()]
+          .filter((room) => countsTowardCapacity(room))
           .sort((a, b) => b.createdAt - a.createdAt)
           .slice(0, ROOM_LIST_LIMIT)
           .map(publicRoomSummary);
@@ -749,7 +765,7 @@ export function createApp(options = {}) {
       }
       if (body.password.length > 0) password = body.password;
     }
-    if (rooms.size >= roomCap) {
+    if (atCapacity()) {
       fail(req, res, 503, 'server is at capacity');
       return;
     }
@@ -757,7 +773,7 @@ export function createApp(options = {}) {
     const passwordHash = password ? await hashPassword(password) : null;
     // Re-check after the async hash: concurrent creates could otherwise
     // overshoot the cap while awaiting scrypt.
-    if (rooms.size >= roomCap) {
+    if (atCapacity()) {
       fail(req, res, 503, 'server is at capacity');
       return;
     }
@@ -857,6 +873,10 @@ export function createApp(options = {}) {
     const color = COLORS.find((candidate) => !room.seats[candidate]);
     if (!color) {
       fail(req, res, 409, 'room is full');
+      return;
+    }
+    if (!countsTowardCapacity(room) && atCapacity()) {
+      fail(req, res, 503, 'server is at capacity');
       return;
     }
 
@@ -1010,6 +1030,10 @@ export function createApp(options = {}) {
         }
         if (!room.seats.white || !room.seats.black) {
           fail(req, res, 409, 'waiting for an opponent');
+          return;
+        }
+        if (room.rematch[color === 'white' ? 'black' : 'white'] && atCapacity()) {
+          fail(req, res, 503, 'server is at capacity');
           return;
         }
         room.rematch[color] = true;

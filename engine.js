@@ -57,7 +57,7 @@ export const TYPES = {
   },
   pawn: {
     name: 'Pawn', short: 'P',
-    description: 'Moves one square straight forward onto an empty square and captures one square diagonally forward. On the last rank it promotes to the piece of its home file; the king-pawn becomes a prince. The rook-file pawn is the pawn-of-pawns: it promotes three times — dormant pawn, returning pawn, then adventitious king — and between promotions must be re-deployed onto a forking square.',
+    description: 'Moves one square straight forward onto an empty square and captures one square diagonally forward. Promotion follows the pawn’s original file, even after captures change its file; the king-pawn becomes a prince. Only the pawn starting on White’s a3 (Black’s k8) is the pawn-of-pawns: its three arrivals produce a dormant pawn, a returning pawn, then an adventitious king. The opposite rook-pawn, starting on White’s k3 (Black’s a8), promotes to a rook.',
   },
 };
 
