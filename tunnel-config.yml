@@ -1,0 +1,6 @@
+tunnel: b8d7bcc9-4281-4bfa-8e00-71a3863ac424
+credentials-file: /etc/cloudflared/credentials.json
+ingress:
+  - hostname: great-chess.entropydrivenmindset.win
+    service: http://server:9277
+  - service: http_status:404

@@ -1,0 +1,13 @@
+{
+  "name": "great-chess",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tamerlane chess: a Linework board, a local bot, interactive lessons and persistent multiplayer rooms.",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test engine.test.js server.test.js"
+  },
+  "dependencies": { "ws": "^8.18.3" }
+}

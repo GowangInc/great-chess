@@ -1,0 +1,8 @@
+node_modules/
+data/
+.env
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.DS_Store
+tunnel-credentials.json

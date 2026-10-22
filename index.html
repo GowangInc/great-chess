@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f3eedf">
+  <meta name="description" content="Play Tamerlane chess: eleven files, a court of extraordinary pieces, and two citadels. Play solo, learn hands-on, or meet a friend online.">
+  <title>Great Chess — Tamerlane chess</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#board-heading">Skip to the board</a>
+<header class="masthead">
+  <div class="brand"><span class="eyebrow">The eleven-file game · A playable reconstruction</span><h1>GREAT CHESS<span class="title-dot">.</span></h1><p>Tamerlane chess <span aria-hidden="true">/</span> An extraordinary court</p></div>
+  <svg class="ledger" viewBox="0 0 240 116" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width=".65"><ellipse cx="120" cy="58" rx="115" ry="53"/><ellipse cx="120" cy="58" rx="105" ry="48"/><ellipse cx="120" cy="58" rx="95" ry="43"/><ellipse cx="120" cy="58" rx="85" ry="38"/><ellipse cx="120" cy="58" rx="75" ry="33"/><ellipse cx="120" cy="58" rx="65" ry="28"/><ellipse cx="120" cy="58" rx="55" ry="23"/><path d="M5 58h60m110 0h60M120 5v30m0 46v30M39 20l43 24m76 28 43 24M39 96l43-24m76-28 43-24M70 10l27 29m46 38 27 29M70 106l27-29m46-38 27-29"/></g><path d="M7 53h24v10H7M209 53h24v10h-24" fill="#b64b35"/><path d="M114 7h12v20h-12m0 62h12v20h-12" fill="#6c7963"/><text x="120" y="62" text-anchor="middle">XI × X</text></svg>
+</header>
+<nav class="mode-nav" aria-label="Play mode"><button data-mode="solo" aria-pressed="true">Solo <span>01</span></button><button data-mode="online" aria-pressed="false">Online rooms <span>02</span></button><button data-mode="learn" aria-pressed="false">Learn <span>03</span></button><a href="#field-guide">Piece field guide ↗</a></nav>
+<main>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <section id="lobby" class="panel lobby" hidden aria-labelledby="lobby-heading">
+    <div class="section-heading"><div><span class="eyebrow">A table for two</span><h2 id="lobby-heading">Online rooms</h2></div><button id="refresh-rooms" class="quiet">Refresh rooms</button></div>
+    <p id="service-status" role="status">Connecting to the room service…</p>
+    <div class="lobby-grid"><form id="create-room"><h3>Open a table</h3><label>Your name<input id="player-name" maxlength="40" required value="Player" autocomplete="nickname"></label><label>Room name<input id="room-name" maxlength="40" required placeholder="An evening game"></label><div class="field-row"><label>Your side<select id="room-color"><option value="white">White</option><option value="black">Black</option></select></label><label>Password <span class="muted">optional</span><input id="room-password" type="password" maxlength="128" autocomplete="new-password"></label></div><button class="primary" type="submit">Create room</button></form><div><h3>Find a table</h3><div id="room-list" class="room-list"></div><form id="join-room"><label>Room ID or invitation URL<input id="join-id" required autocomplete="off"></label><label>Room password <span class="muted">if locked</span><input id="join-password" type="password" maxlength="128" autocomplete="current-password"></label><button type="submit">Join room</button></form></div></div>
+    <details class="advanced"><summary>Independent room servers</summary><p>Rooms live on the selected server. A different host runs an independent lobby.</p><form id="server-form"><label>Server<select id="server-select"></select></label><label>Custom server URL<input id="custom-server" type="url" placeholder="https://chess.example.org"></label><button type="submit">Use server</button></form></details>
+  </section>
+  <div class="play-layout">
+    <section class="board-panel" aria-labelledby="board-heading">
+      <div class="board-heading"><div><span id="game-kicker" class="eyebrow">Solo / Your move</span><h2 id="board-heading" tabindex="-1">The great board</h2></div><button id="flip-board" class="quiet" title="Rotate board">Flip board ↻</button></div>
+      <div class="player-strip"><span id="top-player">Black · The far court</span><span id="top-captured" class="capture-tray" aria-label="Captured white pieces"></span></div>
+      <div class="board-surround"><div id="board" class="board" role="group" aria-label="Tamerlane chess board" aria-describedby="board-help"></div></div>
+      <div class="player-strip bottom"><span id="bottom-player">White · Your court</span><span id="bottom-captured" class="capture-tray" aria-label="Captured black pieces"></span></div>
+      <div class="board-footer"><p id="turn-status" role="status" aria-live="polite">Preparing the court…</p><span id="move-number" class="eyebrow">PLY 00</span></div>
+      <p id="board-help" class="board-help">Select a piece, then a marked square. Keyboard: arrow keys to explore, Enter to select, Escape to clear. Small pawn badges show their promotion.</p>
+      <div id="special-actions" class="special-actions" aria-live="polite"></div>
+    </section>
+    <aside class="sidebar" aria-label="Game controls and information">
+      <section id="solo-controls" class="panel"><span class="eyebrow">Your seat at the table</span><h2>Play the court</h2><div class="field-row"><label>Your side<select id="solo-side"><option value="white">White · moves first</option><option value="black">Black</option><option value="both">Both · local two-player</option></select></label><label>Opponent<select id="difficulty"><option value="easy">Thoughtful / Easy</option><option value="standard" selected>Strategic / Standard</option></select></label></div><button id="new-game" class="primary wide">New game</button><p id="save-status" class="small muted">Your solo game is saved on this device.</p></section>
+      <section id="online-controls" class="panel" hidden><span class="eyebrow">Live table</span><h2 id="active-room-name">Choose a room</h2><p id="connection-status" role="status">No room joined</p><div id="room-players"></div><div class="button-row"><button id="copy-invite">Copy invitation</button><button id="reconnect-room">Reconnect</button></div><div class="button-row"><button id="offer-draw">Offer draw</button><button id="accept-draw" hidden>Accept draw</button><button id="resign">Resign</button><button id="rematch" hidden>Request rematch</button></div><p id="draw-status" class="small"></p><button id="leave-room" class="quiet">Return to lobby</button></section>
+      <section id="lesson-controls" class="panel lesson-panel" hidden><span id="lesson-counter" class="eyebrow">Field school</span><h2 id="lesson-title"></h2><p id="lesson-text"></p><p id="lesson-task" class="lesson-task"></p><p id="lesson-feedback" role="status" aria-live="polite"></p><div class="button-row"><button id="lesson-prev">Previous</button><button id="lesson-retry">Retry</button><button id="lesson-next" class="primary">Next</button></div><details><summary>Why this matters</summary><p id="lesson-explanation"></p></details></section>
+      <section class="panel inspector"><span class="eyebrow">Piece dossier</span><div id="piece-inspector"><h2>A court of possibilities</h2><p>Select any piece to read its movement and see legal destinations.</p></div></section>
+      <section class="panel history-panel"><div class="section-heading"><h2>Game ledger</h2><span id="history-count" class="eyebrow">0 moves</span></div><ol id="history" class="history"><li class="muted">The first move is yours.</li></ol></section>
+    </aside>
+  </div>
+  <section id="field-guide" class="field-guide" aria-labelledby="guide-heading"><div class="section-heading"><div><span class="eyebrow">Know your company</span><h2 id="guide-heading">The piece field guide</h2></div><p>Eleven files. Thirteen kinds of piece.<br>Every pawn has its own destination.</p></div><div id="piece-catalog" class="piece-catalog"></div></section>
+  <section class="sources panel" aria-labelledby="sources-heading"><span class="eyebrow">A note on the record</span><h2 id="sources-heading">History, sources & the rules we play</h2><p>Tamerlane chess is a medieval large-board chess tradition associated with Timur. That association does not establish that he invented it; the familiar story that ordinary chess was “too easy” for him is not a verified fact. This is a playable reconstruction of Tamerlane chess, not the later, different “Great Chess Completed.”</p><p>Light square shading is a modern readability aid, not a claim about historical boards, which were unchequered. All piece drawings and the oval construction above are original. The ruled-oval visual language draws on illustrated <cite>Cerîde-i Adliye</cite> covers.</p><ul class="source-links"><li><a href="https://tamerlaneschess.wordpress.com/2017/03/24/the-rules-of-tamerlane-chess/" target="_blank" rel="noopener noreferrer">The Rules of Tamerlane Chess — detailed reconstruction ↗</a></li><li><a href="https://en.wikipedia.org/wiki/Tamerlane_chess" target="_blank" rel="noopener noreferrer">Tamerlane chess — overview and historical uncertainty ↗</a></li><li><a href="https://en.chessbase.com/post/tamerlane-chess-revived" target="_blank" rel="noopener noreferrer">ChessBase: Tamerlane chess revived — Diana Mihajlova, 2023 ↗</a></li></ul><details open><summary>Exact implementation & reconstruction choices</summary><ul id="rule-notes"></ul></details></section>
+</main>
+<footer><span>GREAT CHESS / Tamerlane chess</span><span>A larger board. A different imagination.</span></footer>
+<noscript>This game requires JavaScript. Enable it to play solo, enter online rooms, or use the interactive lessons.</noscript>
+</body>
+</html>
