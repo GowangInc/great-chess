@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#f3eedf">
-  <meta name="description" content="Play Tamerlane chess: eleven files, a court of extraordinary pieces, and two citadels. Play solo, learn hands-on, or meet a friend online.">
+  <meta name="description" content="Play Tamerlane chess: eleven files, a court of extraordinary pieces, and two citadels. Play against a bot, share a device with a friend, meet online, or learn hands-on.">
   <title>Great Chess — Tamerlane chess</title>
-  <link rel="stylesheet" href="./style.css">
-  <script type="module" src="./app.js"></script>
+  <link rel="stylesheet" href="./style.css?v=2">
+  <script type="module" src="./app.js?v=2"></script>
 </head>
 <body>
 <a class="skip-link" href="#board-heading">Skip to the board</a>
@@ -14,7 +14,7 @@
   <div class="brand"><span class="eyebrow">The eleven-file game · A playable reconstruction</span><h1>GREAT CHESS<span class="title-dot">.</span></h1><p>Tamerlane chess <span aria-hidden="true">/</span> An extraordinary court</p></div>
   <svg class="ledger" viewBox="0 0 240 116" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width=".65"><ellipse cx="120" cy="58" rx="115" ry="53"/><ellipse cx="120" cy="58" rx="105" ry="48"/><ellipse cx="120" cy="58" rx="95" ry="43"/><ellipse cx="120" cy="58" rx="85" ry="38"/><ellipse cx="120" cy="58" rx="75" ry="33"/><ellipse cx="120" cy="58" rx="65" ry="28"/><ellipse cx="120" cy="58" rx="55" ry="23"/><path d="M5 58h60m110 0h60M120 5v30m0 46v30M39 20l43 24m76 28 43 24M39 96l43-24m76-28 43-24M70 10l27 29m46 38 27 29M70 106l27-29m46-38 27-29"/></g><path d="M7 53h24v10H7M209 53h24v10h-24" fill="#b64b35"/><path d="M114 7h12v20h-12m0 62h12v20h-12" fill="#6c7963"/><text x="120" y="62" text-anchor="middle">XI × X</text></svg>
 </header>
-<nav class="mode-nav" aria-label="Play mode"><button data-mode="solo" aria-pressed="true">Solo <span>01</span></button><button data-mode="online" aria-pressed="false">Online rooms <span>02</span></button><button data-mode="learn" aria-pressed="false">Learn <span>03</span></button><a href="#field-guide">Piece field guide ↗</a></nav>
+<nav class="mode-nav" aria-label="Play mode"><button data-mode="solo" aria-pressed="true">Solo</button><button data-mode="local" aria-pressed="false">Local</button><button data-mode="online" aria-pressed="false">Online rooms</button><button data-mode="learn" aria-pressed="false">Learn</button><a href="#field-guide">Piece field guide ↗</a></nav>
 <main>
   <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
   <section id="lobby" class="panel lobby" hidden aria-labelledby="lobby-heading">
@@ -34,7 +34,7 @@
       <div id="special-actions" class="special-actions" aria-live="polite"></div>
     </section>
     <aside class="sidebar" aria-label="Game controls and information">
-      <section id="solo-controls" class="panel"><span class="eyebrow">Your seat at the table</span><h2>Play the court</h2><div class="field-row"><label>Your side<select id="solo-side"><option value="white">White · moves first</option><option value="black">Black</option><option value="both">Both · local two-player</option></select></label><label>Opponent<select id="difficulty"><option value="easy">Thoughtful / Easy</option><option value="standard" selected>Strategic / Standard</option></select></label></div><button id="new-game" class="primary wide">New game</button><p id="save-status" class="small muted">Your solo game is saved on this device.</p></section>
+      <section id="device-controls" class="panel"><span class="eyebrow">Your seat at the table</span><h2 id="device-title">Play the court</h2><p id="local-help" class="small" hidden>Two people, one device. Take turns moving White and Black. No bot or room needed. Use Flip board to face the other player.</p><div id="bot-settings" class="field-row"><label>Your side<select id="solo-side"><option value="white">White · moves first</option><option value="black">Black</option></select></label><label>Opponent<select id="difficulty"><option value="easy">Thoughtful / Easy</option><option value="standard" selected>Strategic / Standard</option></select></label></div><button id="new-game" class="primary wide">New game</button><p id="save-status" class="small muted">Your solo game is saved on this device.</p></section>
       <section id="online-controls" class="panel" hidden><span class="eyebrow">Live table</span><h2 id="active-room-name">Choose a room</h2><p id="connection-status" role="status">No room joined</p><div id="room-players"></div><div class="button-row"><button id="copy-invite">Copy invitation</button><button id="reconnect-room">Reconnect</button></div><div class="button-row"><button id="offer-draw">Offer draw</button><button id="accept-draw" hidden>Accept draw</button><button id="resign">Resign</button><button id="rematch" hidden>Request rematch</button></div><p id="draw-status" class="small"></p><button id="leave-room" class="quiet">Return to lobby</button></section>
       <section id="lesson-controls" class="panel lesson-panel" hidden><span id="lesson-counter" class="eyebrow">Field school</span><h2 id="lesson-title"></h2><p id="lesson-text"></p><p id="lesson-task" class="lesson-task"></p><p id="lesson-feedback" role="status" aria-live="polite"></p><div class="button-row"><button id="lesson-prev">Previous</button><button id="lesson-retry">Retry</button><button id="lesson-next" class="primary">Next</button></div><details><summary>Why this matters</summary><p id="lesson-explanation"></p></details></section>
       <section class="panel inspector"><span class="eyebrow">Piece dossier</span><div id="piece-inspector"><h2>A court of possibilities</h2><p>Select any piece to read its movement and see legal destinations.</p></div></section>

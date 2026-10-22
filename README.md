@@ -5,7 +5,7 @@ Play: **https://gowanginc.github.io/great-chess/**
 A browser-native, Linework-styled reconstruction of **Tamerlane chess**: 11 files × 10 ranks, two citadels, 28 pieces per side, individual pawn promotions, royal exchanges, and the pawn-of-pawns cycle.
 
 - Single player against an easy or standard bot, calculated in a Web Worker.
-- Local two-player play and automatic device-local solo saves.
+- Dedicated **Local** mode for two people sharing one device, with no bot or room required. Solo and Local keep separate automatic device-local saves; changing modes does not replace either game.
 - Eighteen hands-on lessons, movement highlights, piece dossiers and a field guide.
 - Public or password-protected rooms, invitations, saved seats, reconnection, draw offers, resignation and mutual-consent rematches.
 - Concurrent isolated rooms per server; independent server hosts selectable in the advanced lobby.
@@ -29,6 +29,8 @@ npm test
 `engine.test.js` exercises movement, blocking, royal safety and exceptional rules. `server.test.js` exercises the actual engine through HTTP/WebSocket room contracts, authentication, isolation and persistence.
 
 Verified before release: 46 behavioral checks pass, including promotion-time royal safety, sheltered-royal return, and room-capacity recovery without deleting saved games. All 18 tutorial exercises were completed through the rendered board; solo play produced a legal bot reply in its worker. Live checks covered public/password rooms, wrong-password rejection, synchronized moves, reconnection and persistence across deployment restarts.
+
+Local mode was exercised with human moves for both colours, offline play, reload persistence, independent Solo/Local resets, migration of earlier two-player saves, and cancellation/resumption of an in-progress bot calculation. The unnumbered Solo, Local, Online rooms and Learn navigation fits 320px, 390px and desktop widths.
 
 ## Hosting
 

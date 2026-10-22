@@ -11,6 +11,7 @@ const moveKind = move => move.kind || 'move';
 const sameMove = (a,b) => a.from === b.from && a.to === b.to && moveKind(a) === moveKind(b);
 const squareName = key => engine.squareName(key);
 const STORAGE = 'great-chess.solo.v1';
+const LOCAL_STORAGE = 'great-chess.local.v1';
 const SEATS = 'great-chess.seats.v1';
 let storageAvailable = true;
 function readStored(key,fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
@@ -19,8 +20,10 @@ function usableState(state) {
   return state && state.board && ['white','black'].includes(state.turn) && Number.isInteger(state.ply) && state.ply >= 0 && Array.isArray(state.history) && Object.values(state.board).every(piece => piece && engine.TYPES[piece.type] && ['white','black'].includes(piece.color));
 }
 const saved = readStored(STORAGE,null);
-let soloState = usableState(saved?.state) ? saved.state : engine.initialState();
-let side = ['white','black','both'].includes(saved?.side) ? saved.side : 'white';
+const savedLocal = readStored(LOCAL_STORAGE,saved?.side === 'both' ? saved : null);
+let soloState = usableState(saved?.state) && saved?.side !== 'both' ? saved.state : engine.initialState();
+let localState = usableState(savedLocal?.state) ? savedLocal.state : engine.initialState();
+let side = ['white','black'].includes(saved?.side) ? saved.side : 'white';
 let difficulty = saved?.difficulty === 'easy' ? 'easy' : 'standard';
 let flipped = saved?.flipped ?? side === 'black';
 let mode = 'solo';
@@ -66,21 +69,24 @@ function notify(message,error=false) {
   $('notice').textContent = message;
   $('notice').classList.toggle('error',error);
 }
-function stateNow() { return mode === 'learn' ? lessonState : mode === 'online' ? online.state || soloState : soloState; }
+function stateNow() { return mode === 'learn' ? lessonState : mode === 'online' ? online.state || soloState : mode === 'local' ? localState : soloState; }
 function canPlay() {
   const state = stateNow();
   if (state.result) return false;
   if (mode === 'learn') return !lessonComplete || Boolean(state.pendingCitadel);
   if (mode === 'online') return Boolean(activeSeat && online.state && online.room?.players?.length === 2 && online.you === state.turn && !actionPending && onlineHealthy);
-  return !thinking && !botError && (side === 'both' || side === state.turn);
+  if (mode === 'local') return true;
+  return !thinking && !botError && side === state.turn;
 }
 function safeMoves(state) {
   try { return state.result ? [] : engine.legalMoves(state); }
   catch(error) { notify(`The position could not be read: ${error.message}`,true); return []; }
 }
-function saveSolo() {
-  const success = store(STORAGE,{state:soloState,side,difficulty,flipped});
-  $('save-status').textContent = success ? 'Solo game saved automatically on this device.' : 'Device storage is unavailable. Keep this tab open to retain your solo game.';
+function saveDeviceGame() {
+  const local = mode === 'local';
+  const success = store(local ? LOCAL_STORAGE : STORAGE,local ? {state:localState} : {state:soloState,side,difficulty,flipped});
+  const label = local ? 'Local' : 'Solo';
+  $('save-status').textContent = success ? `${label} game saved automatically on this device.` : `Device storage is unavailable. Keep this tab open to retain your ${label.toLowerCase()} game.`;
 }
 function cancelBot() {
   generation++;
@@ -88,7 +94,7 @@ function cancelBot() {
   worker = null; thinking = false;
 }
 function scheduleBot() {
-  if (mode !== 'solo' || side === 'both' || soloState.result || soloState.turn === side || thinking || botError) return;
+  if (mode !== 'solo' || soloState.result || soloState.turn === side || thinking || botError) return;
   cancelBot();
   const myGeneration = generation;
   const sourceState = soloState;
@@ -100,7 +106,7 @@ function scheduleBot() {
   function failBot(message) {
     if (myGeneration !== generation) return;
     cancelBot(); botError = message || 'The opponent could not calculate a move.';
-    notify(`Solo opponent paused: ${botError} Start a new game or choose local two-player.`,true); render();
+    notify(`Solo opponent paused: ${botError} Start a new game or choose the Local tab for two-player play.`,true); render();
   }
   worker.onerror = event => { event.preventDefault(); failBot(event.message); };
   worker.onmessage = ({data}) => {
@@ -109,7 +115,7 @@ function scheduleBot() {
     const candidate = data.move && safeMoves(soloState).find(move=>sameMove(move,data.move));
     if (!candidate) { failBot('No legal move was returned.'); return; }
     cancelBot();
-    try { soloState = engine.applyMove(soloState,candidate); selected = null; saveSolo(); render(); scheduleBot(); }
+    try { soloState = engine.applyMove(soloState,candidate); selected = null; saveDeviceGame(); render(); scheduleBot(); }
     catch(error) { failBot(error.message); }
   };
   worker.postMessage({state:sourceState,depth:difficulty==='easy'?1:2,timeMs:difficulty==='easy'?250:850});
@@ -182,14 +188,17 @@ function renderSpecials(state) {
 function render() {
   const state=stateNow();
   renderBoard(state); renderInspector(state); renderHistory(state); renderSpecials(state);
-  $('solo-controls').hidden=mode!=='solo';
+  $('device-controls').hidden=mode!=='solo' && mode!=='local';
+  $('bot-settings').hidden=mode!=='solo';
+  $('local-help').hidden=mode!=='local';
+  $('device-title').textContent=mode==='local'?'Two players · One device':'Play the court';
   $('online-controls').hidden=mode!=='online';
   $('lesson-controls').hidden=mode!=='learn';
   $('lobby').hidden=mode!=='online' || Boolean(activeSeat && online.state);
   $('solo-side').value=side; $('difficulty').value=difficulty;
   for(const button of document.querySelectorAll('[data-mode]')) button.setAttribute('aria-pressed',String(button.dataset.mode===mode));
   $('move-number').textContent=`PLY ${String(state.ply).padStart(2,'0')}`;
-  $('game-kicker').textContent=mode==='learn'?`Field school / Lesson ${lessonIndex+1}`:mode==='online'?'Online / Shared court':side==='both'?'Local / Two players':'Solo / The eleven-file game';
+  $('game-kicker').textContent=mode==='learn'?`Field school / Lesson ${lessonIndex+1}`:mode==='online'?'Online / Shared court':mode==='local'?'Local / Two players':'Solo / The eleven-file game';
   let status;
   if(state.result) status=`${state.result.winner?`${title(state.result.winner)} wins`:'Draw'} · ${state.result.reason}`;
   else if(state.pendingCitadel) status=`${title(state.turn)} · Choose your citadel resolution`;
@@ -197,9 +206,9 @@ function render() {
   else if(mode==='online' && !online.state) status='Choose or create a room above. Your solo game is safe.';
   else if(mode==='online' && online.room?.players?.length<2) status='Waiting for the second player. Share your invitation.';
   else if(mode==='online' && !onlineHealthy) status='Connection paused · Reconnecting to the authoritative game…';
-  else status=`${title(state.turn)} to move${mode==='solo'&&side!=='both'&&state.turn===side?' · Your court':''}${engine.inCheck(state,state.turn)?' · Check':''}`;
+  else status=`${title(state.turn)} to move${mode==='solo'&&state.turn===side?' · Your court':''}${engine.inCheck(state,state.turn)?' · Check':''}`;
   $('turn-status').textContent=status;
-  const playerLabel=color=>mode==='online'&&online.state?`${title(color)} · ${online.room?.players?.find(player=>player.color===color)?.name || 'Open seat'}`:`${title(color)} · ${mode==='learn'?'Field school':side==='both'?'Local player':side===color?'Your court':'The other court'}`;
+  const playerLabel=color=>mode==='online'&&online.state?`${title(color)} · ${online.room?.players?.find(player=>player.color===color)?.name || 'Open seat'}`:`${title(color)} · ${mode==='learn'?'Field school':mode==='local'?'Local player':side===color?'Your court':'The other court'}`;
   $('top-player').textContent=playerLabel(flipped?'white':'black');
   $('bottom-player').textContent=playerLabel(flipped?'black':'white');
   if(mode==='learn') renderLesson();
@@ -226,7 +235,8 @@ async function commitMove(move) {
     const next=engine.applyMove(state,legal);
     selected=null; inspected=legal.to;
     notify('');
-    if(mode==='solo') { soloState=next; saveSolo(); }
+    if(mode==='solo') { soloState=next; saveDeviceGame(); }
+    else if(mode==='local') { localState=next; saveDeviceGame(); }
     else {
       lessonState=next;
       if(LESSONS[lessonIndex].accepts(legal,state,next) || (lessonComplete && state.pendingCitadel)) { lessonComplete=true; lessonFeedback=next.pendingCitadel?'Good entry. Resolve the citadel choice below the board.':'Well played. You made the required legal move.'; }
@@ -243,15 +253,22 @@ function setMode(next) {
   else disconnectSocket();
   if(next==='learn') flipped=false;
   else if(next==='solo') flipped=side==='black';
+  else if(next==='local') flipped=false;
+  if(next==='solo' || next==='local') saveDeviceGame();
   render(); scheduleBot();
 }
-function newSolo({settings=false}={}) {
-  if(soloState.ply>0 && !soloState.result && !confirm('Start a new solo game? This replaces your saved solo position.')) {
+function newGame() {
+  const local=mode==='local';
+  const label=local?'local':'solo';
+  const state=stateNow();
+  if(state.ply>0 && !state.result && !confirm(`Start a new ${label} game? This replaces your saved ${label} position.`)) {
     $('solo-side').value=side; $('difficulty').value=difficulty; return;
   }
-  cancelBot(); side=$('solo-side').value; difficulty=$('difficulty').value;
-  botError=''; soloState=engine.initialState(); flipped=side==='black'; selected=null; inspected=null;
-  notify(''); saveSolo(); render(); scheduleBot();
+  cancelBot();
+  if(local) localState=engine.initialState();
+  else { side=$('solo-side').value; difficulty=$('difficulty').value; soloState=engine.initialState(); }
+  botError=''; flipped=!local && side==='black'; selected=null; inspected=null;
+  notify(''); saveDeviceGame(); render(); scheduleBot();
 }
 function renderLesson() {
   const lesson=LESSONS[lessonIndex];
@@ -501,10 +518,10 @@ $('board').addEventListener('keydown',event=>{
 });
 $('special-actions').addEventListener('click',event=>{ const button=event.target.closest('[data-special]'); if(button) commitMove(currentMoves[Number(button.dataset.special)]); });
 for(const button of document.querySelectorAll('[data-mode]')) button.addEventListener('click',()=>setMode(button.dataset.mode));
-$('flip-board').addEventListener('click',()=>{flipped=!flipped;if(mode==='solo')saveSolo();render();});
-$('new-game').addEventListener('click',()=>newSolo());
-$('solo-side').addEventListener('change',()=>newSolo({settings:true}));
-$('difficulty').addEventListener('change',()=>{difficulty=$('difficulty').value;saveSolo();cancelBot();botError='';render();scheduleBot();});
+$('flip-board').addEventListener('click',()=>{flipped=!flipped;if(mode==='solo' || mode==='local')saveDeviceGame();render();});
+$('new-game').addEventListener('click',()=>newGame());
+$('solo-side').addEventListener('change',()=>newGame());
+$('difficulty').addEventListener('change',()=>{difficulty=$('difficulty').value;saveDeviceGame();cancelBot();botError='';render();scheduleBot();});
 $('lesson-prev').addEventListener('click',()=>loadLesson(lessonIndex-1));
 $('lesson-retry').addEventListener('click',()=>loadLesson(lessonIndex));
 $('lesson-next').addEventListener('click',()=>{if(!lessonComplete || lessonState.pendingCitadel)return;if(lessonIndex===LESSONS.length-1)setMode('solo');else loadLesson(lessonIndex+1);});
@@ -546,7 +563,8 @@ $('leave-room').addEventListener('click',()=>{disconnectSocket();activeSeat=null
 window.addEventListener('online',()=>{if(mode==='online'){if(activeSeat)resumeSeat(activeSeat);else refreshRooms();}});
 window.addEventListener('beforeunload',()=>{cancelBot();disconnectSocket();});
 
-populateServers(); renderCatalog(); render(); saveSolo();
+if(saved?.side==='both') store(LOCAL_STORAGE,{state:localState});
+populateServers(); renderCatalog(); render(); saveDeviceGame();
 const params=new URLSearchParams(location.search);
 if(params.get('room')) {
   try { if(params.get('server'))apiBase=normalizedServer(params.get('server'));populateServers();$('join-id').value=params.get('room');setMode('online');notify('Invitation ready. Enter your name and room password, if needed, then join.'); }
